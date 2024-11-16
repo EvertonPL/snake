@@ -1,123 +1,312 @@
-#include<stdio.h>
-#include<stdlib.h> // Para função srand() e system()
-#include<windows.h> // Para função SetConsoleCursorPosition()
-#include<conio.h> // Para função getch() e kbhit()
-#include<time.h> // Para função rand()
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
 
-// Variáveis Globais
-int c[300][2], pontos=1, cx=2, cy=2;
-int comida[2]; 
-float velo=150;
+#define LARGURA_BASE 20
+#define ALTURA_BASE 10
+#define MAX_COMPRIMENTO 100
 
-// FUNÇÕES
-void gotoxy(int x, int y){ // Função 
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),(COORD){x,y});
-}
+#define CIMA 1
+#define BAIXO 2
+#define ESQUERDA 3
+#define DIREITA 4
 
-void desenha(){ // Desenha a cobrinha
-    int i;
-    for(i=0; i<pontos; i++){
-        gotoxy(c[i][0],c[i][1]);
-        printf("%c",219);
+#ifdef _WIN32
+    #include <conio.h>
+    #include <windows.h> // Para Sleep() no Windows
+#else
+    #include <unistd.h> // Para usleep() no Linux/UNIX
+    #include <termios.h>
+    #include <fcntl.h>
+#endif
+
+typedef struct {
+    int x;
+    int y;
+} Posicao;
+
+typedef struct {
+    int dificuldade;
+    char nome[50];
+    int total_obstaculos;
+    int largura;
+    int altura;
+    int velocidade;
+} Fase;
+
+typedef struct {
+    Posicao corpo[MAX_COMPRIMENTO];
+    int comprimento;
+    int direcao;
+    char nome[50];
+} Cobra;
+
+typedef struct {
+    Fase fase_atual;
+    Cobra cobra;
+    Posicao comida;
+    int pontos;
+    int terminou;
+} Jogo;
+
+void limpar_tela();
+void desenhar_tabuleiro(Jogo *jogo);
+void gerar_comida(Jogo *jogo);
+int verificar_colisao(Jogo *jogo);
+void mover_cobra(Jogo *jogo);
+void iniciar_jogo(Jogo *jogo, Fase fase);
+void controle(Jogo *jogo);
+void salvar_estatisticas(Jogo *jogo);
+void exibir_instrucoes();
+void game_over(Jogo *jogo);
+void exibir_estatisticas();
+
+#ifdef _WIN32
+    int tecla_pressionada() {
+        return _kbhit() ? _getch() : -1;
     }
-}
+#else
+    int tecla_pressionada() {
+        struct termios oldt, newt;
+        int ch;
+        int oldf;
 
-void atualiza(){ // Atualiza a posição da cobrinha
-    int i;
-    gotoxy(c[pontos][0],c[pontos][1]);
-    printf(" ");
-    for(i=pontos; i>=0; i--){
-        c[i+1][0] = c[i][0];
-        c[i+1][1] = c[i][1];
-    }
-}
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
 
-int analiza(){ // Vê se a cobrinha enconstou em seu próprio corpo
-    int i, retorno=0;
-    for(i=1; i<pontos; i++){
-        if(cx==c[i][0] && cy==c[i][1]){
-            retorno=1;
+        ch = getchar();
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+        if (ch != EOF) {
+            ungetc(ch, stdin);
+            return ch;
         }
-    }
-    return retorno;
-}
 
-void geraComida(){ // Gera comida em local aleatório
-    gotoxy(comida[0],comida[1]);
-    printf(" ");
+        return -1;
+    }
+#endif
+
+int main() {
     srand(time(NULL));
-    comida[0] = (rand() % 48) +1;
-    comida[1] = (rand() % 18) +1;
-    gotoxy(comida[0],comida[1]);
-    printf("%c",5);
+    Jogo jogo;
+    Fase fases[] = {
+        {1, "Muito Facil", 0, LARGURA_BASE, ALTURA_BASE, 200},
+        {2, "Facil", 2, LARGURA_BASE + 5, ALTURA_BASE + 3, 150},
+        {3, "Medio", 4, LARGURA_BASE + 7, ALTURA_BASE + 5, 100},
+        {4, "Dificil", 6, LARGURA_BASE + 10, ALTURA_BASE + 7, 50},
+        {5, "Impossivel", 8, 30, 20, 10}
+    };
+
+    int opcao, nivel;
+    do {
+        limpar_tela();
+        printf("1. Iniciar Jogo\n2. Estatisticas\n3. Instrucoes\n0. Sair\nEscolha uma opcao: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
+			case 1:
+			    printf("Escolha o nivel (1-5): ");
+			    scanf("%d", &nivel);
+			    if (nivel >= 1 && nivel <= 5) {
+			        printf("Digite o nome da sua cobra: ");
+			        getchar(); // Limpa o buffer de entrada
+			        fgets(jogo.cobra.nome, sizeof(jogo.cobra.nome), stdin);
+			        jogo.cobra.nome[strcspn(jogo.cobra.nome, "\n")] = 0; // Remove o caractere de nova linha
+			        iniciar_jogo(&jogo, fases[nivel - 1]);
+			    } else {
+			        printf("Nivel invalido.\n");
+			    }
+			    break;
+
+            case 2:
+                exibir_estatisticas();
+                break;
+            case 3:
+                exibir_instrucoes();
+                break;
+            case 0:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opcao invalida!\n");
+                break;
+        }
+    } while (opcao != 0);
+
+    return 0;
 }
 
-int main(){
-    int i, gameover=0;
-    int tecla;
-system("cls");
-    for(i=0; i<50; i++){ // Linha superior
-        gotoxy(i,0);
-        printf("%c",219);
-        Sleep(5); // Pausa execução por 5 milissegunos
-    }
-    for(i=0; i<20; i++){ // Coluna da direita
-        gotoxy(50,i);
-        printf("%c",219);
-        Sleep(5); // Pausa execução por 5 milissegunos
-    }
-    for(i=50; i>=0; i--){ // Linha inferior
-        gotoxy(i,20);
-        printf("%c",219);
-        Sleep(05); // Pausa execução por 5 milissegunos
-    }
-    for(i=20; i>0; i--){ //Coluna da esquerda
-        gotoxy(0,i);
-        printf("%c",219);
-        Sleep(5); // Pausa execução por 5 milissegunos
-    }
-    geraComida(); // Gera a primeira comida
-    desenha(); // Desenha a cobra
-    tecla='d'; // A direção é para a direita
-    while(gameover==0){ // Enquanto o usuário não perder
-        gotoxy(52,2); // Move o cursor para c: 52, l: 2
-        printf("Pontos: %d\t",pontos);
-        gotoxy(52,4); 
-        printf("Velocidade: %.2f caracteres/s",1000/velo);
-        c[0][0]=cx;
-        c[0][1]=cy;
-        if(kbhit()) // Se alguma tecla for apertada, o valor 
-            tecla=getch(); // vai para a variável 'tecla'
+void limpar_tela() {
+    #ifdef _WIN32
+        system("cls");
+    #else
+        system("clear");
+    #endif
+}
 
-        if(tecla=='w' || tecla=='W' || tecla==72){
-            cy--;
-            if(cy==0) break; // Se a cabeça da cobra estiver na parede superior,
-        }                    // O jogo acaba
-        if(tecla=='a' || tecla=='A' || tecla==75){
-            cx--;
-            if(cx==0) break; // Se a cabeça da cobra estiver na parede da esquerda,
-        }                    // O Jogo acaba
-        if(tecla=='s' || tecla=='S' || tecla==80){
-            cy++;
-            if(cy==20) break; // Se a cabeça da cobra estiver na parede de baixo,
-        }                     // O jogo acaba
-        if(tecla=='d' || tecla=='D' || tecla==77){
-            cx++;
-            if(cx>=50) break; // Se a a cabeça da cobra estiver na parede da direida,
-        }                     // O jogo acaba
-
-        if(cx==comida[0] && cy==comida[1]){ // Se a cobra comer a comida
-            pontos++;
-            if(velo>50) velo-=10; // Velocidade em milissegundos abaixa
-            geraComida();
+void desenhar_tabuleiro(Jogo *jogo) {
+    limpar_tela();
+    for (int i = 0; i < jogo->fase_atual.altura; i++) {
+        for (int j = 0; j < jogo->fase_atual.largura; j++) {
+            if (i == 0 || i == jogo->fase_atual.altura - 1 || j == 0 || j == jogo->fase_atual.largura - 1) {
+                printf("#");
+            } else if (i == jogo->comida.y && j == jogo->comida.x) {
+                printf("@");
+            } else {
+                int cobra_impressa = 0;
+                for (int k = 0; k < jogo->cobra.comprimento; k++) {
+                    if (jogo->cobra.corpo[k].x == j && jogo->cobra.corpo[k].y == i) {
+                        printf("O");
+                        cobra_impressa = 1;
+                        break;
+                    }
+                }
+                if (!cobra_impressa) printf(" ");
+            }
         }
-        gameover=analiza();
-        atualiza(); // Atualiza a cobra
-        desenha(); // Desenha a cobra
-        gotoxy(50,20);
-        Sleep(velo);
+        printf("\n");
     }
-    system("cls"); // Quando o usuário perder, limpa a tela e exibe uma mensagem final
-    printf("Voce perdeu! Fez %d pontos.\n",pontos);
-    system("pause");
+    printf("Nome da cobra: %s  |  Pontos: %d\n", jogo->cobra.nome, jogo->pontos);
+}
+
+void gerar_comida(Jogo *jogo) {
+    jogo->comida.x = rand() % (jogo->fase_atual.largura - 2) + 1;
+    jogo->comida.y = rand() % (jogo->fase_atual.altura - 2) + 1;
+}
+
+int verificar_colisao(Jogo *jogo) {
+    if (jogo->cobra.corpo[0].x == 0 || jogo->cobra.corpo[0].x == jogo->fase_atual.largura - 1 ||
+        jogo->cobra.corpo[0].y == 0 || jogo->cobra.corpo[0].y == jogo->fase_atual.altura - 1) {
+        return 1;
+    }
+
+    for (int i = 1; i < jogo->cobra.comprimento; i++) {
+        if (jogo->cobra.corpo[i].x == jogo->cobra.corpo[0].x && jogo->cobra.corpo[i].y == jogo->cobra.corpo[0].y) {
+            return 1;
+        }
+    }
+
+    if (jogo->cobra.corpo[0].x == jogo->comida.x && jogo->cobra.corpo[0].y == jogo->comida.y) {
+        jogo->pontos += 10;
+        jogo->cobra.comprimento++;
+        gerar_comida(jogo);
+    }
+
+    return 0;
+}
+
+void mover_cobra(Jogo *jogo) {
+    for (int i = jogo->cobra.comprimento - 1; i > 0; i--) {
+        jogo->cobra.corpo[i] = jogo->cobra.corpo[i - 1];
+    }
+
+    switch (jogo->cobra.direcao) {
+        case CIMA: jogo->cobra.corpo[0].y--; break;
+        case BAIXO: jogo->cobra.corpo[0].y++; break;
+        case ESQUERDA: jogo->cobra.corpo[0].x--; break;
+        case DIREITA: jogo->cobra.corpo[0].x++; break;
+    }
+}
+
+void iniciar_jogo(Jogo *jogo, Fase fase) {
+    jogo->fase_atual = fase;
+    jogo->cobra.comprimento = 1;
+    jogo->cobra.direcao = DIREITA;
+    jogo->cobra.corpo[0].x = fase.largura / 2;
+    jogo->cobra.corpo[0].y = fase.altura / 2;
+    jogo->pontos = 0;
+    jogo->terminou = 0;
+    gerar_comida(jogo);
+
+    while (!jogo->terminou) {
+        desenhar_tabuleiro(jogo);
+        controle(jogo);
+        mover_cobra(jogo);
+        jogo->terminou = verificar_colisao(jogo);
+
+        #ifdef _WIN32
+            Sleep(jogo->fase_atual.velocidade);
+        #else
+            usleep(jogo->fase_atual.velocidade * 1000);
+        #endif
+    }
+
+    game_over(jogo);
+}
+
+void controle(Jogo *jogo) {
+    int tecla = tecla_pressionada();
+    if (tecla != -1) {
+        switch (tecla) {
+            case 72: if (jogo->cobra.direcao != BAIXO) jogo->cobra.direcao = CIMA; break;
+            case 80: if (jogo->cobra.direcao != CIMA) jogo->cobra.direcao = BAIXO; break;
+            case 75: if (jogo->cobra.direcao != DIREITA) jogo->cobra.direcao = ESQUERDA; break;
+            case 77: if (jogo->cobra.direcao != ESQUERDA) jogo->cobra.direcao = DIREITA; break;
+        }
+    }
+}
+
+void salvar_estatisticas(Jogo *jogo) {
+    FILE *f = fopen("estatisticas.bin", "ab");  // Modo binário de adição
+    if (f != NULL) {
+        // Grava o nome da cobra e a pontuação no arquivo binário
+        fwrite(jogo->cobra.nome, sizeof(jogo->cobra.nome), 1, f);  // Grava o nome da cobra (com 50 bytes)
+        fwrite(&jogo->pontos, sizeof(jogo->pontos), 1, f);  // Grava a pontuação
+        fclose(f);
+    } else {
+        printf("Erro ao salvar as estatísticas.\n");
+    }
+}
+
+
+
+void exibir_instrucoes() {
+    printf("Instrucoes do Jogo:\nUse as setas do teclado para mover a cobra.\n");
+    printf("Evite bater nas paredes e no proprio corpo da cobra.\nComa a comida para crescer e aumentar os pontos.\n");
+    printf("Pressione qualquer tecla para voltar...\n");
+    getchar();
+    getchar();
+}
+
+void game_over(Jogo *jogo) {
+    printf("\n------------------------------");
+    printf("\n\tGAME OVER!");
+    printf("\nNome da cobra: %s", jogo->cobra.nome);
+    printf("\nPontuacao final: %d", jogo->pontos);
+    printf("\n------------------------------\n");
+    salvar_estatisticas(jogo);
+
+    int opcao;
+    printf("1. Jogar novamente\n0. Sair\nEscolha uma opcao: ");
+    scanf("%d", &opcao);
+
+    if (opcao == 1) iniciar_jogo(jogo, jogo->fase_atual);
+}
+
+void exibir_estatisticas() {
+    FILE *f = fopen("estatisticas.bin", "rb");  // Modo binário de leitura
+    if (f == NULL) {
+        printf("Nenhuma estatistica encontrada.\n");
+        return;
+    }
+
+    char nome[50];
+    int pontos;
+
+    printf("Estatísticas:\n");
+
+    // Loop de leitura do arquivo binário
+    while (fread(nome, sizeof(nome), 1, f) == 1 && fread(&pontos, sizeof(pontos), 1, f) == 1) {
+        // Exibe o nome e pontos lidos
+        printf("Nome: %s | Pontos: %d\n", nome, pontos);
+    }
+
+    fclose(f);
 }
