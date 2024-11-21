@@ -1,7 +1,16 @@
 #ifndef SNAKE_H
 #define SNAKE_H
 
+// Largura, altura, comprimentos máximo
+#define LARGURA_BASE 20
+#define ALTURA_BASE 10
 #define MAX_COMPRIMENTO 100
+
+// Define controles da Cobra
+#define CIMA 1
+#define BAIXO 2
+#define ESQUERDA 3
+#define DIREITA 4
 
 typedef struct {
     int x;
