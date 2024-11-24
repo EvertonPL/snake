@@ -14,11 +14,11 @@ int main() {
     
     // Array com os nomes dos arquivos de fases
     const char *arquivosFases[] = {
-        "nivel1.txt",
-        "nivel2.txt",
-        "nivel3.txt",
-        "nivel4.txt",
-        "nivel5.txt"
+        "niveis/nivel1.txt",
+        "niveis/nivel2.txt",
+        "niveis/nivel3.txt",
+        "niveis/nivel4.txt",
+        "niveis/nivel5.txt"
     };
 
     int opcao, nivel, chave;

@@ -85,6 +85,7 @@ void desenhar_tabuleiro(Jogo *jogo) {
            jogo->fase_atual.dificuldade);
 }
 
+// função para carregar as fases
 void carregarFase(const char *arquivo, Fase *fase) {
     FILE *file = fopen(arquivo, "r");
 
