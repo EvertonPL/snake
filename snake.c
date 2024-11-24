@@ -11,12 +11,14 @@ int main() {
 	setlocale(LC_ALL, "Portuguese"); // Colocar o idioma em Português
     srand(time(NULL)); // Gerar numero aleatório
     Jogo jogo;
-    Fase fases[] = {
-        {1, "Muito Facil", 0, LARGURA_BASE, ALTURA_BASE, 200},
-        {2, "Facil", 2, LARGURA_BASE + 5, ALTURA_BASE + 3, 150},
-        {3, "Medio", 4, LARGURA_BASE + 7, ALTURA_BASE + 5, 100},
-        {4, "Dificil", 6, LARGURA_BASE + 10, ALTURA_BASE + 7, 50},
-        {5, "Impossível", 8, 30, 20, 10}
+    
+    // Array com os nomes dos arquivos de fases
+    const char *arquivosFases[] = {
+        "nivel1.txt",
+        "nivel2.txt",
+        "nivel3.txt",
+        "nivel4.txt",
+        "nivel5.txt"
     };
 
     int opcao, nivel, chave;
@@ -43,7 +45,10 @@ int main() {
 				        getchar();
 				        fgets(jogo.cobra.nome, sizeof(jogo.cobra.nome), stdin);
 				        jogo.cobra.nome[strcspn(jogo.cobra.nome, "\n")] = 0;
-				        iniciar_jogo(&jogo, fases[nivel - 1]);
+				         // Carregar a fase selecionada
+                        Fase fase;
+                        carregarFase(arquivosFases[nivel - 1], &fase);
+                        iniciar_jogo(&jogo, fase);
 				    } else {
 				    	chave++;
 				        printf("Nível inválido.\n");
@@ -51,7 +56,7 @@ int main() {
 	        			getchar();
 	        			system("cls");
 				    }
-				} while(chave = 0);
+				} while(chave == 0);
 			    break;
 
             case 2:

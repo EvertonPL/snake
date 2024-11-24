@@ -15,5 +15,5 @@ void salvar_estatisticas(Jogo *jogo);
 void exibir_instrucoes();
 void game_over(Jogo *jogo);
 void exibir_estatisticas();
-
+void carregarFase(const char *arquivo, Fase *fase);
 #endif // FUNCOES_H

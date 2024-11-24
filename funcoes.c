@@ -85,6 +85,25 @@ void desenhar_tabuleiro(Jogo *jogo) {
            jogo->fase_atual.dificuldade);
 }
 
+void carregarFase(const char *arquivo, Fase *fase) {
+    FILE *file = fopen(arquivo, "r");
+
+    if (file == NULL) {
+        printf("Erro ao abrir o arquivo: %s\n", arquivo);
+        exit(1);
+    }
+
+    fscanf(file, "%d\n", &fase->dificuldade);
+    fgets(fase->nome, sizeof(fase->nome), file);
+    fase->nome[strcspn(fase->nome, "\n")] = '\0'; // Remover o '\n'
+    fscanf(file, "%d\n", &fase->total_obstaculos);
+    fscanf(file, "%d\n", &fase->largura);
+    fscanf(file, "%d\n", &fase->altura);
+    fscanf(file, "%d\n", &fase->velocidade);
+
+    fclose(file);
+}
+
 // Função de gerar comida
 void gerar_comida(Jogo *jogo) {
     jogo->comida.x = rand() % (jogo->fase_atual.largura - 2) + 1;
